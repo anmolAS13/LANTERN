@@ -144,21 +144,42 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Run
+### Run the sensor
+
+**Replay mode** (no live network or root needed):
+```bash
+python tools/make_captures.py                      # generate demo captures in captures/
+python -m sensor replay captures/arp_spoof.pcap --gateway-ip 192.168.1.1
+python -m sensor replay captures/port_scan.pcap
+python -m sensor replay captures/rogue_dhcp.pcap
+```
+
+**Live mode** on the gateway (lab network only, see Responsible use):
+```bash
+sudo .venv/bin/python -m sensor live -i wlan0 --gateway-ip 192.168.1.1 --jsonl alerts.jsonl
+```
+
+Useful options: `--gateway-mac` pins the router's real MAC, `--trusted-dhcp IP` names the real DHCP server,
+`--scan-threshold` / `--scan-window` tune port scan sensitivity. Run `python -m sensor live -h` for all of them.
+
+### Test
+```bash
+python -m pytest
+```
+
+### Full system (planned)
 1. **Start the central server** on the machine that will host the dashboard.
 2. **Start Sensor A** on the gateway (requires `sudo`), pointing it at the server.
 3. **Start Sensor B** on the internet-facing server.
 4. **Open the dashboard** in a browser.
 
-To test without a live network, run the sensor in **replay mode** against a file in `captures/`.
-
 ---
 
 ## Roadmap
 
-- [ ] Sniffer core and shared alert format
-- [ ] Zone 1 detections: port scan, ARP spoofing, rogue DHCP
-- [ ] Replay mode for saved captures
+- [x] Sniffer core and shared alert format ([docs/alert-format.md](docs/alert-format.md))
+- [x] Zone 1 detections: port scan, ARP spoofing, rogue DHCP
+- [x] Replay mode for saved captures
 - [ ] Central server (FastAPI + SQLite)
 - [ ] Zone 3 detections: threat feeds, DGA scoring, DNS tunneling, beaconing
 - [ ] Zone 2 sensor: SSH brute force, SYN flood, web attack patterns
