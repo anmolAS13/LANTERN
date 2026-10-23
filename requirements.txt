@@ -1,5 +1,5 @@
 scapy>=2.5
 pytest>=7
 fastapi
-uvicorn
+uvicorn[standard]
 httpx
