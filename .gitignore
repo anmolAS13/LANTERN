@@ -6,3 +6,5 @@ __pycache__/
 alerts.jsonl
 captures/*.pcap
 !captures/README.md
+lantern.db
+.venv/
