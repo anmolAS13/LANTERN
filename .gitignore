@@ -7,4 +7,3 @@ alerts.jsonl
 captures/*.pcap
 !captures/README.md
 lantern.db
-.venv/

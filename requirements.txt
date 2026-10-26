@@ -3,3 +3,7 @@ pytest>=7
 fastapi
 uvicorn[standard]
 httpx
+numpy
+pandas
+scikit-learn==1.9.1
+joblib

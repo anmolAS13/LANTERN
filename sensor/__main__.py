@@ -9,6 +9,11 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import json
+from pathlib import Path
+
+from ml_module.feature_extraction import FlowFeatureExtractor
+from ml_module.inference import MLInference
 
 from sensor.detectors import ArpSpoofDetector, PortScanDetector, RogueDhcpDetector
 from sensor.engine import Sensor
@@ -58,24 +63,71 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     sensor = build_sensor(args)
 
+    extractor = FlowFeatureExtractor()
+    inference = MLInference()
+
+    output_path = (
+        Path(__file__).resolve().parents[1]
+        / "ml_module"
+        / "output"
+        / "predictions.jsonl"
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def handle_packet(pkt):
+        # Preserve existing LANTERN detections.
+        sensor.handle(pkt)
+
+        # Feed the same packet into the feature extractor.
+        completed_flows = extractor.add_packet(pkt)
+
+        # Run inference for every completed flow.
+        for flow in completed_flows:
+            prediction = inference.predict(flow["features"])
+
+            result = {
+                "metadata": flow["metadata"],
+                "prediction": prediction,
+            }
+
+            with output_path.open("a", encoding="utf-8") as output_file:
+                output_file.write(
+                    json.dumps(result, ensure_ascii=False, default=str) + "\n"
+                )
+
+
     if args.mode == "replay":
         from scapy.utils import PcapReader
 
         with PcapReader(args.pcap) as reader:
             for pkt in reader:
-                sensor.handle(pkt)
+                handle_packet(pkt)
     else:
         from scapy.sendrecv import sniff
 
         print(f"LANTERN {args.name} listening on {args.iface or 'default interface'} (Ctrl+C to stop)")
         try:
-            sniff(iface=args.iface, filter=CAPTURE_FILTER, prn=sensor.handle, store=False)
+            sniff(iface=args.iface, filter=CAPTURE_FILTER, prn=handle_packet, store=False)
         except PermissionError:
             print("Live capture needs root. Try: sudo python -m sensor live ...", file=sys.stderr)
             return 1
         except KeyboardInterrupt:
             pass
 
+    for flow in extractor.flush():
+        prediction = inference.predict(flow["features"])
+
+        result = {
+            "metadata": flow["metadata"],
+            "prediction": prediction,
+        }
+
+        with output_path.open("a", encoding="utf-8") as output_file:
+            output_file.write(
+                json.dumps(result, ensure_ascii=False, default=str) + "\n"
+            )
+ 
     print(f"\n{sensor.packets_seen} packets inspected, {sensor.alerts_raised} alerts raised.")
     return 0
 

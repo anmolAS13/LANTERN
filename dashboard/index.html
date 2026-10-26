@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANTERN // Three-Zone Network Threat Defense</title>
+  
+  <!-- Preconnect to Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Drag and drop overlay for alerts.jsonl -->
+  <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    <h2>INGEST ALERTS.JSONL</h2>
+    <p>Drop capture file to replay alerts into LANTERN telemetry feed</p>
+  </div>
+
+  <main class="dashboard-shell">
+    <!-- Topbar / Header -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="lantern-wrap" aria-label="Emerald LANTERN active energy core">
+          <svg class="lantern" viewBox="0 0 180 250" role="img" aria-labelledby="lantern-title">
+            <title id="lantern-title">Emerald LANTERN Corps Signal Lantern</title>
+            <defs>
+              <!-- Film-grain / stipple effect applied ONLY to the lantern logo -->
+              <filter id="grain">
+                <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" stitchTiles="stitch"/>
+                <feColorMatrix type="saturate" values="0"/>
+                <feBlend in="SourceGraphic" mode="screen"/>
+              </filter>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="9"/>
+              </filter>
+            </defs>
+            <ellipse cx="90" cy="135" rx="62" ry="76" fill="#1fe36f" opacity="0.2" filter="url(#glow)"/>
+            <!-- Outer arch handle -->
+            <path d="M55 54 Q54 18 90 10 Q126 18 125 54" fill="none" stroke="#b8923f" stroke-width="8"/>
+            <!-- Cap top -->
+            <path d="M65 52 Q90 29 115 52 L125 68 H55 Z" fill="#b8923f" stroke="#e2bf6e" stroke-width="2"/>
+            <!-- Vertical rib lines with stipple filter -->
+            <path d="M67 61 L70 192 M82 56 L84 198 M98 56 L96 198 M113 61 L110 192" stroke="#1fe36f" stroke-width="4" opacity="0.65" filter="url(#grain)"/>
+            <!-- Central round lens with concentric rings -->
+            <circle cx="90" cy="130" r="33" fill="#092a19" stroke="#b8923f" stroke-width="6"/>
+            <circle cx="90" cy="130" r="20" fill="#1fe36f" opacity="0.9" filter="url(#grain)"/>
+            <circle cx="84" cy="123" r="7" fill="#d8ffe5" opacity="0.85"/>
+            <!-- Outer struts -->
+            <path d="M51 75 Q27 91 42 117 Q49 127 52 135 M129 75 Q153 91 138 117 Q131 127 128 135" fill="none" stroke="#b8923f" stroke-width="7"/>
+            <!-- Base baseplate -->
+            <path d="M47 186 Q90 207 133 186 L122 208 Q90 222 58 208 Z" fill="#b8923f" stroke="#e2bf6e" stroke-width="2"/>
+            <path d="M51 216 H129" stroke="#b8923f" stroke-width="9" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="eyebrow">NETWORK INTRUSION DEFENSE SYSTEM</span>
+          <h1>LANTERN</h1>
+          <p>LAN And Network Threat Explanation &amp; Response Node</p>
+        </div>
+      </div>
+
+      <div class="status-cluster">
+        <span id="connection-status-pill" class="status-pill pill-live">
+          <span class="pulse-dot"></span>
+          <span id="connection-status-text">LIVE</span>
+        </span>
+        <span id="demo-data-badge" class="demo-badge">DEMO DATA</span>
+        <span class="sector-label">SECTOR 07 / CORPS WATCH</span>
+      </div>
+    </header>
+
+    <!-- Backend Down Notice Banner -->
+    <div id="backend-down-banner" class="backend-banner">
+      <div>
+        <strong>⚠️ BACKEND OFFLINE:</strong> Disconnected from <code id="banner-api-url">http://127.0.0.1:8000</code>. Reconnecting with exponential backoff...
+      </div>
+      <span>STANDBY</span>
+    </div>
+
+    <!-- Command Console / Corps Watch -->
+    <section class="console-heading">
+      <div>
+        <span class="section-kicker">// COMMAND CONSOLE</span>
+        <h2>Corps Watch <span>— three sectors, one perimeter</span></h2>
+      </div>
+      <div class="pulse-readout">
+        <span class="sensor-mesh-icon"></span>
+        SENSOR MESH <b id="sensor-mesh-val">100%</b>
+      </div>
+    </section>
+
+    <!-- Sector Grid (Inside, Inbound, Outbound) -->
+    <section class="sector-grid">
+      <!-- Sector 01: Inside -->
+      <article id="sector-card-inside" class="sector-card">
+        <div class="card-top">
+          <div>
+            <span class="sector-index">SECTOR 01</span>
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+              </svg>
+              Inside
+            </h3>
+            <p class="sector-desc">LAN devices in conflict</p>
+          </div>
+          <div class="gauge">
+            <div>
+              <strong class="gauge-count">0</strong>
+              <span>ALERTS</span>
+            </div>
+          </div>
+        </div>
+        <div class="latest">
+          <span class="latest-kicker">LATEST ALERT</span>
+          <strong class="latest-title">Awaiting telemetry</strong>
+          <p class="latest-reason">Awaiting Zone 1 detector telemetry.</p>
+          <time class="latest-meta">--:--:-- · Standby</time>
+        </div>
+      </article>
+
+      <!-- Sector 02: Inbound -->
+      <article id="sector-card-inbound" class="sector-card">
+        <div class="card-top">
+          <div>
+            <span class="sector-index">SECTOR 02</span>
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="17" y1="7" x2="7" y2="17"></line>
+                <polyline points="17 17 7 17 7 7"></polyline>
+              </svg>
+              Inbound
+            </h3>
+            <p class="sector-desc">Internet → our perimeter</p>
+          </div>
+          <div class="gauge">
+            <div>
+              <strong class="gauge-count">0</strong>
+              <span>ALERTS</span>
+            </div>
+          </div>
+        </div>
+        <div class="latest">
+          <span class="latest-kicker">LATEST ALERT</span>
+          <strong class="latest-title">No sensor reporting yet</strong>
+          <p class="latest-reason">Sensor mesh awaiting inbound traffic feed.</p>
+          <time class="latest-meta">--:--:-- · Standby</time>
+        </div>
+      </article>
+
+      <!-- Sector 03: Outbound -->
+      <article id="sector-card-outbound" class="sector-card">
+        <div class="card-top">
+          <div>
+            <span class="sector-index">SECTOR 03</span>
+            <h3>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
+              </svg>
+              Outbound
+            </h3>
+            <p class="sector-desc">Our devices → hostile net</p>
+          </div>
+          <div class="gauge">
+            <div>
+              <strong class="gauge-count">0</strong>
+              <span>ALERTS</span>
+            </div>
+          </div>
+        </div>
+        <div class="latest">
+          <span class="latest-kicker">LATEST ALERT</span>
+          <strong class="latest-title">No sensor reporting yet</strong>
+          <p class="latest-reason">Sensor mesh awaiting outbound traffic feed.</p>
+          <time class="latest-meta">--:--:-- · Standby</time>
+        </div>
+      </article>
+    </section>
+
+    <!-- Main Grid: Signal Stream (Left) & Telemetry (Right) -->
+    <section class="main-grid">
+      <!-- Left Panel: Live Alert Feed -->
+      <article class="panel feed-panel">
+        <div class="panel-header">
+          <div>
+            <span class="section-kicker">// SIGNAL STREAM</span>
+            <h2>Live alert feed <small>newest first</small></h2>
+          </div>
+          <span id="feed-count" class="feed-count">00 / 00</span>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="filters">
+          <div class="filter-group">
+            <span>SEVERITY</span>
+            <button class="active" data-filter-severity="all">ALL</button>
+            <button data-filter-severity="low">LOW</button>
+            <button data-filter-severity="medium">MEDIUM</button>
+            <button data-filter-severity="high">HIGH</button>
+            <button data-filter-severity="critical">CRITICAL</button>
+          </div>
+          <div class="filter-group">
+            <span>SECTOR</span>
+            <button class="active" data-filter-zone="all">ALL</button>
+            <button data-filter-zone="inside">INSIDE</button>
+            <button data-filter-zone="inbound">INBOUND</button>
+            <button data-filter-zone="outbound">OUTBOUND</button>
+          </div>
+        </div>
+
+        <!-- Feed List -->
+        <div id="alert-feed-list" class="alert-list" aria-label="Live alert stream">
+          <!-- Dynamically populated -->
+        </div>
+      </article>
+
+      <!-- Right Side Stack: Telemetry & Threat Analysis -->
+      <div class="side-stack">
+        <!-- Telemetry Panel -->
+        <article class="panel telemetry-panel">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker">// TELEMETRY</span>
+              <h2>Alerts over time</h2>
+            </div>
+            <div class="chart-header-actions">
+              <button id="toggle-telemetry-btn" class="chevron-btn" aria-label="Toggle telemetry view" aria-expanded="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="telemetry-body" class="telemetry-body">
+            <div class="chart-legend">
+              <span><i class="legend-inside"></i> Inside</span>
+              <span><i class="legend-inbound"></i> Inbound</span>
+              <span><i class="legend-outbound"></i> Outbound</span>
+            </div>
+
+            <div class="chart-container">
+              <canvas id="time-chart"></canvas>
+            </div>
+
+            <div class="breakdown-header">
+              <span class="section-kicker">// THREAT DISTRIBUTION</span>
+              <h3>Attack Signature Breakdown</h3>
+            </div>
+
+            <div class="doughnut-container">
+              <canvas id="breakdown-chart"></canvas>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <span>“In brightest day, in blackest night, no alert escapes our sight.”</span>
+      <span>LANTERN v0.7.4 <b>●</b> ALL SENSORS NOMINAL</span>
+    </footer>
+  </main>
+
+  <!-- Detail Drawer & Backdrop -->
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="detail-drawer" class="detail-drawer" aria-labelledby="drawer-title" aria-modal="true" role="dialog">
+    <div class="drawer-top-bar">
+      <span class="eyebrow">// THREAT INSPECTION // ID ENUMERATION</span>
+      <button id="drawer-close-btn" class="drawer-close-btn">✕ ESC</button>
+    </div>
+    <div id="drawer-content" class="drawer-content">
+      <!-- Dynamically populated -->
+    </div>
+  </aside>
+
+  <!-- CDN Dependencies pinned exact versions -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <!-- ES Modules Entrypoint -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
