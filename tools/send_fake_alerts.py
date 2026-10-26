@@ -3,9 +3,11 @@ built and demoed without any sensors running.
 
     python tools/send_fake_alerts.py                 # 20 alerts, 1 per second
     python tools/send_fake_alerts.py --count 100 --interval 0.2
+    python tools/send_fake_alerts.py --real-ips      # public IPs, so GeoIP can fill `country`
     python tools/send_fake_alerts.py --url http://192.168.1.10:8000 --api-key secret
 
-Uses only the standard library. All IPs are reserved documentation/private ranges.
+Uses only the standard library. By default all IPs are reserved example/private ranges;
+--real-ips swaps in a few well-known public addresses (not real attackers).
 """
 import argparse
 import json
@@ -20,7 +22,17 @@ def ep(ip=None, mac=None, port=None):
     return {"ip": ip, "mac": mac, "port": port}
 
 
-def make_alert():
+# Well-known public DNS servers, used ONLY as stand-in "attacker" addresses so that
+# GeoIP has real public IPs to look up. They are not real attackers.
+PUBLIC_IPS = ["8.8.8.8", "1.1.1.1", "9.9.9.9", "114.114.114.114", "77.88.8.8", "208.67.222.222"]
+
+
+def make_alert(real_ips=False):
+    def pub():  # an internet address: real public one, or a reserved example one
+        return random.choice(PUBLIC_IPS) if real_ips else "203.0.113.%d" % random.randint(2, 250)
+
+    attacker = pub()
+    c2 = pub()
     atk = random.choice([
         ("inside", "arp_spoofing", "critical",
          "Device 192.168.1.7 is pretending to be your router 192.168.1.1. Someone may be reading your traffic.",
@@ -31,18 +43,19 @@ def make_alert():
         ("inside", "rogue_dhcp", "high",
          "Device 192.168.1.9 is handing out network addresses, but it isn't your real DHCP server.",
          ep("192.168.1.9", "aa:bb:cc:00:00:09"), None, {"offered_dns": "192.168.1.9"}),
-        ("inbound", "ssh_brute_force", "high",f"{(ip := '203.0.113.%d' % random.randint(2, 250))} tried 40 passwords on your server's SSH login in one minute.",
-         ep(ip, None, random.randint(40000, 60000)), ep("198.51.100.10", None, 22),
+        ("inbound", "ssh_brute_force", "high",
+         f"{attacker} tried 40 passwords on your server's SSH login in one minute.",
+         ep(attacker, None, random.randint(40000, 60000)), ep("198.51.100.10", None, 22),
          {"attempts": 40}),
         ("inbound", "sql_injection", "medium",
          "A request to /login contained SQL code meant to trick the database.",
-         ep("203.0.113.%d" % random.randint(2, 250)), ep("198.51.100.10", None, 80), {"path": "/login"}),
+         ep(attacker), ep("198.51.100.10", None, 80), {"path": "/login"}),
         ("outbound", "beaconing", "medium",
-         "Device 192.168.1.15 contacts 198.51.100.77 every 10 seconds, like malware phoning home.",
-         ep("192.168.1.15"), ep("198.51.100.77", None, 443), {"interval_seconds": 10}),
+         f"Device 192.168.1.15 contacts {c2} every 10 seconds, like malware phoning home.",
+         ep("192.168.1.15"), ep(c2, None, 443), {"interval_seconds": 10}),
         ("outbound", "dns_tunneling", "high",
          "Device 192.168.1.15 is sending unusually long DNS names, which can hide stolen data.",
-         ep("192.168.1.15"), ep("192.0.2.53", None, 53), {"avg_label_length": 52}),
+         ep("192.168.1.15"), ep(c2, None, 53), {"avg_label_length": 52}),
     ])
     zone, attack, sev, reason, src, tgt, details = atk
     return {"id": uuid.uuid4().hex, "zone": zone, "attack": attack, "severity": sev,
@@ -65,9 +78,11 @@ if __name__ == "__main__":
     p.add_argument("--count", type=int, default=20)
     p.add_argument("--interval", type=float, default=1.0)
     p.add_argument("--api-key")
+    p.add_argument("--real-ips", action="store_true",
+                   help="use real public IPs so the server's GeoIP can fill in `country`")
     a = p.parse_args()
     for i in range(a.count):
-        alert = make_alert()
+        alert = make_alert(a.real_ips)
         status = post(a.url, alert, a.api_key)
         print(f"[{i + 1}/{a.count}] {status} {alert['zone']}/{alert['attack']} ({alert['severity']})")
         time.sleep(a.interval)

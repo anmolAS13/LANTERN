@@ -40,13 +40,27 @@ Allowed values: zone = `inside` / `inbound` / `outbound`; severity = `low` / `me
       "country": null
     }
 
-Notes: `target` can be null. `details` differs per attack. `country` is null until GeoIP
-is added (only inbound/outbound alerts will get one). Timestamps are UTC.
+Notes: `target` can be null. `details` differs per attack. Timestamps are UTC.
+
+`country` is a 2-letter code like `"CN"`, filled in by the server (never the sensor) from
+the attacker's IP: the `source` for `inbound` alerts, the `target` for `outbound` ones.
+It is `null` for `inside` alerts, private/reserved IPs, IPs the database doesn't know, and
+whenever GeoIP isn't set up. The dashboard must handle `null`.
 
 ## For sensors
 
 `POST /alerts` with the JSON from the sensor's `Alert.to_json()`. Returns 201 (stored) or
 200 (this id was already stored, so a retry is harmless). Bad data returns 422 with the reason.
 Optional: set `LANTERN_API_KEY` on the server and send an `X-API-Key` header.
+
+## GeoIP setup (optional)
+
+1. `pip install geoip2`
+2. Free account at MaxMind, download **GeoLite2 Country** (the .mmdb file) from the account portal.
+3. Put `GeoLite2-Country.mmdb` in the folder you start the server from, or set `LANTERN_GEOIP_DB`
+   to its path. Never commit the file (it is git-ignored).
+4. Check: `GET /health` shows `"geoip": true`.
+
+Test with real public IPs: `python tools/send_fake_alerts.py --real-ips`
 
 Database file: `lantern.db` (override with `LANTERN_DB`). Keep it out of git.
