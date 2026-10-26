@@ -7,6 +7,4 @@ alerts.jsonl
 captures/*.pcap
 !captures/README.md
 
-# Python ML outputs and caches
-ml_module/output/
-ml_module/output/
+
