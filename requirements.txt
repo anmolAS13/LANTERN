@@ -1,9 +1,10 @@
 scapy>=2.5
 pytest>=7
 fastapi
-uvicorn
+uvicorn[standard]
 httpx
 numpy
 pandas
 scikit-learn==1.9.1
 joblib
+geoip2

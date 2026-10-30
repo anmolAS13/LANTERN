@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .db import Database
+from .geo import GeoLookup, alert_ip
 from .schemas import AlertIn, AlertOut
 
 
@@ -38,10 +39,11 @@ class Hub:
                 self.disconnect(ws)
 
 
-def create_app(db_path: Optional[str] = None) -> FastAPI:
+def create_app(db_path: Optional[str] = None, geo=None) -> FastAPI:
     db = Database(db_path or os.environ.get("LANTERN_DB", "lantern.db"))
     api_key = os.environ.get("LANTERN_API_KEY")  # optional shared secret for sensors
     hub = Hub()
+    geo = geo or GeoLookup()
     app = FastAPI(title="LANTERN server", version="0.2.0")
     app.add_middleware(CORSMiddleware, allow_origins=["*"],
                        allow_methods=["*"], allow_headers=["*"])  # dashboard dev
@@ -52,7 +54,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok"}
+        return {"status": "ok", "geoip": getattr(geo, "enabled", True)}
 
     @app.post("/alerts", response_model=AlertOut, status_code=201,
               dependencies=[Depends(check_key)])
@@ -61,7 +63,8 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
         data["id"] = data["id"] or uuid.uuid4().hex
         ts = alert.timestamp or datetime.now(timezone.utc)
         data["timestamp"] = ts.astimezone(timezone.utc).isoformat()
-        country = None  # GeoIP lookup plugs in here later
+        ip = alert_ip(data)
+        country = geo.lookup(ip) if ip else None
         saved, created = db.insert(data, country)
         if created:
             await hub.broadcast(saved)
